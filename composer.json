@@ -7,5 +7,8 @@
     "support": {
         "issues": "https://www.drupal.org/project/issues/workbench_moderation_migrate",
         "source": "https://git.drupalcode.org/project/workbench_moderation_migrate"
+    },
+    "require": {
+        "drupal/migmag": "1.2.x-dev"
     }
 }

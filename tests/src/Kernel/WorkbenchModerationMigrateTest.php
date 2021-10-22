@@ -31,6 +31,7 @@ class WorkbenchModerationMigrateTest extends MigrateDrupal7TestBase {
     'text',
     'workbench_moderation_migrate',
     'workflows',
+    'migmag_callback_upgrade',
   ];
 
   /**

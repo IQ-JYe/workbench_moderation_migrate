@@ -54,4 +54,3 @@
 - Node with multiple published revisions (279026) published version was edited
   and kept published [10]
 - Node with multiple published revisions (279026) yet another draft [11]
-

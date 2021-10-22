@@ -36,11 +36,16 @@ trait MigrationTestDatabaseTrait {
       $prefix = is_array($value['prefix']) ? $value['prefix']['default'] : $value['prefix'];
       // Simpletest uses 7 character prefixes at most so this can't cause
       // collisions.
-      $connection_info[$target]['prefix']['default'] = $prefix . '0';
+      if (is_string($connection_info[$target]['prefix'])) {
+        $connection_info[$target]['prefix'] = $prefix . '0';
+        continue;
+      }
 
+      $connection_info[$target]['prefix']['default'] = $prefix . '0';
       // Add the original simpletest prefix so SQLite can attach its database.
       // @see \Drupal\Core\Database\Driver\sqlite\Connection::init()
-      $connection_info[$target]['prefix'][$value['prefix']['default']] = $value['prefix']['default'];
+      $connection_info[$target]['prefix'][$value['prefix']['default']] = $prefix;
+      break;
     }
     Database::addConnectionInfo('migrate', 'default', $connection_info['default']);
   }
@@ -60,12 +65,28 @@ trait MigrationTestDatabaseTrait {
       asort($counts);
       end($counts);
       $pilot = $rows[key($counts)];
-      $schema = array_map(function ($value) {
-        $type = is_numeric($value) && !is_float($value + 0)
-          ? 'int'
-          : 'text';
-        return ['type' => $type];
-      }, $pilot);
+      $schema = array_map(
+        function ($value) {
+          $type = [];
+
+          // If the value is unserializable, use longblob.
+          try {
+            unserialize($value);
+            $type = [
+              'type' => 'blob',
+              'size' => 'big',
+            ];
+          }
+          catch (\Throwable $t) {
+            // unserialize() throws a notice on error.
+            $type['type'] = is_numeric($value) && !is_float($value + 0)
+              ? 'int'
+              : 'text';
+          }
+          return $type;
+        },
+        $pilot
+      );
 
       $this->sourceDatabase->schema()
         ->createTable($table, [

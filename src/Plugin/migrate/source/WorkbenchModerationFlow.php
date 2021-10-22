@@ -71,10 +71,21 @@ class WorkbenchModerationFlow extends DrupalSqlBase {
    * {@inheritdoc}
    */
   public function getIds() {
-    // One record for one default moderation state.
+    // The goal is to have one record per default moderation state.
+    //
+    // Unfortunately, PostgreSQL fails unless we use "map" type (which
+    // translates to longblob, so the source and destination values will be
+    // comparable).
+    // But MySQL can index only the first N chars of a BLOB or TEXT column,
+    // meanwhile it seems it is able to correctly compare blob and string column
+    // values.
+    // SQLite doesn't care whatever the type is.
+    $value_type = $this->getDatabase() instanceof PostgreSqlConnection
+      ? 'map'
+      : 'string';
     return [
       'value' => [
-        'type' => 'string',
+        'type' => $value_type,
         'alias' => 'vw',
       ],
     ];
@@ -99,8 +110,10 @@ class WorkbenchModerationFlow extends DrupalSqlBase {
 
     // Convert the aggregated node_types string to a keyed array what
     // sub_process and migration_lookup can process.
+    $node_types = explode(',', $row->getSourceProperty('node_types'));
+    sort($node_types);
     $node_types_keyed_array = array_reduce(
-      explode(',', $row->getSourceProperty('node_types')),
+      $node_types,
       function (array $carry, string $node_type) {
         $carry[] = ['node_type' => $node_type];
         return $carry;
