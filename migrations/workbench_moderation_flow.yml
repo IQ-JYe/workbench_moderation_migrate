@@ -1,4 +1,6 @@
 id: workbench_moderation_flow
+label: 'Workbench Moderation flow'
+deriver: Drupal\workbench_moderation_migrate\Plugin\migrate\WorkbenchModerationFlowDeriver
 migration_tags:
   - Drupal 7
   - Configuration
@@ -122,5 +124,5 @@ process:
 destination:
   plugin: entity:workflow
 migration_dependencies:
-  required:
+  optional:
     - d7_node_type

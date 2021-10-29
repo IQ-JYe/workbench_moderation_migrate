@@ -182,6 +182,7 @@ class WorkbenchModerationFlowTest extends NativeMigrateSqlTestBase {
               ['node_type' => 'basic_page'],
               ['node_type' => 'news'],
             ],
+            'node_types_aggregated' => 'basic_page,news',
           ],
         ],
       ],
@@ -213,6 +214,7 @@ class WorkbenchModerationFlowTest extends NativeMigrateSqlTestBase {
               ['node_type' => 'reports_and_presentations'],
               ['node_type' => 'rule'],
             ],
+            'node_types_aggregated' => 'book,event_calendar,memo,news,news_article,news_release,page,reports_and_presentations,rule',
           ],
           [
             'value' => 's:9:"published";',
@@ -222,6 +224,7 @@ class WorkbenchModerationFlowTest extends NativeMigrateSqlTestBase {
               ['node_type' => 'form'],
               ['node_type' => 'psychiatric_formulary_drugs'],
             ],
+            'node_types_aggregated' => 'form,psychiatric_formulary_drugs',
           ],
         ],
         'count' => 2,

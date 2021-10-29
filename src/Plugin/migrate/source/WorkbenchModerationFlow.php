@@ -52,8 +52,14 @@ class WorkbenchModerationFlow extends DrupalSqlBase {
     $node_types_expression = $this->getDatabase() instanceof PostgreSqlConnection
       ? "STRING_AGG(nt.type, ',')"
       : 'GROUP_CONCAT(nt.type)';
-    $query->addExpression($node_types_expression, 'node_types');
+    $query->addExpression($node_types_expression, 'node_types_aggregated');
     $query->groupBy('vw.value');
+
+    $default_state_serialized = $this->configuration['default_state_serialized'] ?? NULL;
+
+    if ($default_state_serialized) {
+      $query->condition('vw.value', $default_state_serialized);
+    }
 
     return $query;
   }
@@ -64,6 +70,10 @@ class WorkbenchModerationFlow extends DrupalSqlBase {
   public function fields() {
     return [
       'value' => $this->t('The default moderation state.'),
+      'workbench_moderation_states' => $this->t('The available moderation states.'),
+      'workbench_moderation_transitions' => $this->t('The available moderation transitions.'),
+      'node_types' => $this->t('The node types the current flow belongs to (sub-keyed array what
+    sub_process and migration_lookup can process).'),
     ];
   }
 
@@ -110,8 +120,11 @@ class WorkbenchModerationFlow extends DrupalSqlBase {
 
     // Convert the aggregated node_types string to a keyed array what
     // sub_process and migration_lookup can process.
-    $node_types = explode(',', $row->getSourceProperty('node_types'));
+    $node_types = explode(',', $row->getSourceProperty('node_types_aggregated'));
     sort($node_types);
+    // Re-set the aggregated node types with alphabetical order for coherent
+    // test results.
+    $row->setSourceProperty('node_types_aggregated', implode(',', $node_types));
     $node_types_keyed_array = array_reduce(
       $node_types,
       function (array $carry, string $node_type) {

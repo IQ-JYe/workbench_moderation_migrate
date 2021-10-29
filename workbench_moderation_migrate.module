@@ -37,20 +37,93 @@ function workbench_moderation_migrate_help($route_name) {
  * Implements hook_migration_plugins_alter().
  */
 function workbench_moderation_migrate_migration_plugins_alter(array &$migrations) {
+  $workbench_flow_migrations = array_filter(
+    $migrations,
+    function ($definition) {
+      return $definition['id'] === 'workbench_moderation_flow';
+    }
+  );
+  if (empty($workbench_flow_migrations)) {
+    return;
+  }
+
+  $moderated_node_types = array_reduce(
+    $workbench_flow_migrations,
+    function (array $carry, array $definition) {
+      $node_types = explode(',', $definition['source']['node_types_aggregated']);
+      $default_state = $definition['source']['default_state'];
+      $types_with_default_state = array_combine(
+        $node_types,
+        array_fill(0, count($node_types), "workbench_moderation_flow:$default_state")
+      );
+      $carry = array_merge($carry, $types_with_default_state);
+      return $carry;
+    },
+    []
+  );
+  if (empty($moderated_node_types)) {
+    return;
+  }
+
+  // Migrations of moderated node types should depend on
+  // "workbench_moderation_flow" migrations.
   $node_complete_migrations = array_filter(
     $migrations,
     function ($definition) {
       return $definition['destination']['plugin'] === 'entity_complete:node';
     }
   );
+  if (empty($node_complete_migrations)) {
+    return;
+  }
   foreach ($node_complete_migrations as $id => $definition) {
+    $node_type = $definition['source']['node_type'];
+    if (!in_array($node_type, array_keys($moderated_node_types), TRUE)) {
+      continue;
+    }
+    $migrations[$id]['migration_tags'] = array_unique(
+      array_merge(
+        $definition['migration_tags'] ?? [],
+        ['Workbench Moderated Content']
+      )
+    );
     $migrations[$id]['process']['moderation_state'] = 'workbench_moderation_state';
     $migrations[$id]['migration_dependencies']['required'] = array_unique(
       array_merge(
-        $migrations[$id]['migration_dependencies']['required'] ?? [],
-        ['workbench_moderation_flow']
+        $definition['migration_dependencies']['required'] ?? [],
+        [$moderated_node_types[$node_type]]
       )
     );
+  }
+
+  // Support derived node type migrations.
+  $node_type_migrations = array_filter(
+    $migrations,
+    function ($definition) {
+      return $definition['id'] === 'd7_node_type';
+    }
+  );
+  if (count($node_type_migrations) > 1) {
+    foreach ($workbench_flow_migrations as $id => $definition) {
+      $lookup_migrations = [];
+      $node_type_dep_key = array_search('d7_node_type', ($definition['migration_dependencies']['optional'] ?? []));
+      if ($node_type_dep_key !== FALSE) {
+        unset($migrations[$id]['migration_dependencies']['optional'][$node_type_dep_key]);
+      }
+
+      // Use more specific node type migration dependencies.
+      foreach (explode(',', $definition['source']['node_types_aggregated']) as $node_type) {
+        $derived_type_migration_id = "d7_node_type:{$node_type}";
+        if (!empty($node_type_migrations[$derived_type_migration_id])) {
+          $lookup_migrations[] = $derived_type_migration_id;
+          $migrations[$id]['migration_dependencies']['required'][] = $derived_type_migration_id;
+        }
+      }
+
+      if (!empty($migrations[$id]['process']['type_settings/entity_types/node'][0]['process']['node_type']['migration'])) {
+        $migrations[$id]['process']['type_settings/entity_types/node'][0]['process']['node_type']['migration'] = $lookup_migrations;
+      }
+    }
   }
 }
 
@@ -58,7 +131,10 @@ function workbench_moderation_migrate_migration_plugins_alter(array &$migrations
  * Implements hook_migrate_prepare_row().
  */
 function workbench_moderation_migrate_migrate_prepare_row(Row $row, MigrateSourceInterface $source, MigrationInterface $migration) {
-  if ($migration->getDestinationPlugin()->getPluginId() !== 'entity_complete:node') {
+  if (
+    $migration->getDestinationPlugin()->getPluginId() !== 'entity_complete:node' ||
+    !in_array('Workbench Moderated Content', $migration->getMigrationTags())
+  ) {
     return;
   }
 
