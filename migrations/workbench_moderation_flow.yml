@@ -122,12 +122,35 @@ process:
           - name
       to: name
       weight: weight
+  computed_transition_keys:
+    -
+      plugin: sub_process
+      source: workbench_moderation_states
+      process:
+        key:
+          -
+            plugin: concat
+            source:
+              - missing
+              - name
+            delimiter: '_keep_in_'
+          -
+            plugin: machine_name
+    -
+      plugin: flatten
+  computed_transitions:
+    plugin: callback
+    callable: array_combine
+    unpack_source: true
+    source:
+      - '@computed_transition_keys'
+      - '@computed_state_keeping_transitions'
   'type_settings/transitions':
     plugin: callback
     callable: array_merge
     unpack_source: true
     source:
-      - '@computed_state_keeping_transitions'
+      - '@computed_transitions'
       - '@source_transitions'
   # We need an archive transition in Drupal 9.
   'type_settings/transitions/archive': 'constants/archive_transition'

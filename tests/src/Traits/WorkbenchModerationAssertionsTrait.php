@@ -96,19 +96,19 @@ trait WorkbenchModerationAssertionsTrait {
             'needs_review',
           ],
         ],
-        'draft' => [
+        '_keep_in_draft' => [
           'label' => 'Keep in Draft',
           'from' => ['draft'],
           'to' => 'draft',
           'weight' => -99,
         ],
-        'published' => [
+        '_keep_in_published' => [
           'label' => 'Keep in Published',
           'from' => ['published'],
           'to' => 'published',
           'weight' => 99,
         ],
-        'needs_review' => [
+        '_keep_in_needs_review' => [
           'label' => 'Keep in Needs Review',
           'from' => ['needs_review'],
           'to' => 'needs_review',
