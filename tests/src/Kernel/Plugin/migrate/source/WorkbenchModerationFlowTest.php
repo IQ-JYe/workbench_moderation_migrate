@@ -2,18 +2,21 @@
 
 namespace Drupal\Tests\workbench_moderation_migrate\Kernel\Plugin\migrate\source;
 
+use Drupal\Tests\migmag\Kernel\MigMagNativeMigrateSqlTestBase;
+
 /**
  * Tests the 'workbench_moderation_flow' migrate source plugin.
  *
  * @covers \Drupal\workbench_moderation_migrate\Plugin\migrate\source\WorkbenchModerationFlow
  * @group workbench_moderation_migrate
  */
-class WorkbenchModerationFlowTest extends NativeMigrateSqlTestBase {
+class WorkbenchModerationFlowTest extends MigMagNativeMigrateSqlTestBase {
 
   /**
    * {@inheritdoc}
    */
   public static $modules = [
+    'migrate_drupal',
     'workbench_moderation_migrate',
   ];
 

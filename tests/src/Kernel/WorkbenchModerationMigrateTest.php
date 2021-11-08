@@ -4,8 +4,8 @@ namespace Drupal\Tests\workbench_moderation_migrate\Kernel;
 
 use Drupal\Core\Config\Entity\ConfigEntityStorageInterface;
 use Drupal\migrate_drupal\NodeMigrateType;
+use Drupal\Tests\migmag\Traits\MigMagKernelTestDxTrait;
 use Drupal\Tests\migrate_drupal\Kernel\d7\MigrateDrupal7TestBase;
-use Drupal\Tests\workbench_moderation_migrate\Traits\MigrateKernelTestDxTrait;
 use Drupal\Tests\workbench_moderation_migrate\Traits\WorkbenchModerationAssertionsTrait;
 use Drupal\Tests\workbench_moderation_migrate\Traits\WorkbenchModerationTestToolsTrait;
 
@@ -16,7 +16,7 @@ use Drupal\Tests\workbench_moderation_migrate\Traits\WorkbenchModerationTestTool
  */
 class WorkbenchModerationMigrateTest extends MigrateDrupal7TestBase {
 
-  use MigrateKernelTestDxTrait;
+  use MigMagKernelTestDxTrait;
   use WorkbenchModerationTestToolsTrait;
   use WorkbenchModerationAssertionsTrait;
 
