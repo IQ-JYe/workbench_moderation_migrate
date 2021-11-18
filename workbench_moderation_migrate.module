@@ -7,11 +7,11 @@
 
 declare(strict_types = 1);
 
-use Drupal\migrate\MigrateSkipRowException;
 use Drupal\migrate\Plugin\MigrateSourceInterface;
 use Drupal\migrate\Plugin\MigrationInterface;
 use Drupal\migrate\Row;
 use Drupal\migrate_drupal\Plugin\migrate\source\DrupalSqlBase;
+use Drupal\workbench_moderation_migrate\ModerationStateMigrate;
 
 /**
  * Implements hook_help().
@@ -84,10 +84,9 @@ function workbench_moderation_migrate_migration_plugins_alter(array &$migrations
     $migrations[$id]['migration_tags'] = array_unique(
       array_merge(
         $definition['migration_tags'] ?? [],
-        ['Workbench Moderated Content']
+        [ModerationStateMigrate::MODERATED_NODE_MIGRATION_TAG]
       )
     );
-    $migrations[$id]['process']['moderation_state'] = 'workbench_moderation_state';
     $migrations[$id]['migration_dependencies']['required'] = array_unique(
       array_merge(
         $definition['migration_dependencies']['required'] ?? [],
@@ -133,7 +132,7 @@ function workbench_moderation_migrate_migration_plugins_alter(array &$migrations
 function workbench_moderation_migrate_migrate_prepare_row(Row $row, MigrateSourceInterface $source, MigrationInterface $migration) {
   if (
     $migration->getDestinationPlugin()->getPluginId() !== 'entity_complete:node' ||
-    !in_array('Workbench Moderated Content', $migration->getMigrationTags())
+    !in_array(ModerationStateMigrate::MODERATED_NODE_MIGRATION_TAG, $migration->getMigrationTags())
   ) {
     return;
   }
@@ -142,187 +141,5 @@ function workbench_moderation_migrate_migrate_prepare_row(Row $row, MigrateSourc
     return;
   }
 
-  if (
-    !($nid = $row->getSourceProperty('nid')) ||
-    !($vid = $row->getSourceProperty('vid'))
-  ) {
-    return;
-  }
-
-  $revisions_last_transition = $source->getDatabase()
-    ->select('workbench_moderation_node_history', 'tr')
-    ->fields('tr')
-    ->condition('tr.nid', $nid)
-    ->condition('tr.vid', $vid)
-    ->orderBy('tr.hid', 'DESC')
-    ->range(0, 1)
-    ->execute()
-    ->fetchAll(\PDO::FETCH_ASSOC);
-  $revisions_last_transition = reset($revisions_last_transition);
-
-  // Ignore the migration of the current revision if:
-  // - the current revision is published => published, AND
-  // - the previous transition's "[to_]state" is not published, AND
-  // - We can find a previous transition with published "[to_]state" whose
-  //   node revision exists (because with workbench moderation users were able
-  //   to delete node revisions).
-  if (
-    $revisions_last_transition['from_state'] === 'published' &&
-    $revisions_last_transition['state'] === 'published'
-  ) {
-    $previous_transition_q = $source->getDatabase()
-      ->select('workbench_moderation_node_history', 'prev_s')
-      ->fields('prev_s')
-      ->condition('prev_s.nid', $nid)
-      ->condition('prev_s.hid', $revisions_last_transition['hid'], '<')
-      ->orderBy('prev_s.hid', 'DESC')
-      ->range(0, 1);
-    $previous_transition = $previous_transition_q->execute()
-      ->fetchAll(\PDO::FETCH_ASSOC);
-
-    if ($previous_transition[0]['state'] !== 'published') {
-      // Check whether the node was published before, meaning that it has an
-      // existing node revision whose last state is published.
-      $node_was_published_before_q = $source->getDatabase()
-        ->select('workbench_moderation_node_history', 'h')
-        ->condition('h.nid', $nid);
-      // Restrict to existing node revisions.
-      $node_was_published_before_q->innerJoin('node_revision', 'nr', 'nr.vid = h.vid');
-      // Subquery for getting only the highest history ID for the same revision.
-      $nwpbq_sub = $source->getDatabase()
-        ->select('workbench_moderation_node_history', 'w')
-        ->fields('w', ['vid'])
-        ->condition('w.nid', $nid);
-      $nwpbq_sub->addExpression('MAX(w.hid)', 'highest_hid_for_vid');
-      $nwpbq_sub->groupBy('w.vid');
-      $node_was_published_before_q->innerJoin($nwpbq_sub, 'hhfv', 'hhfv.highest_hid_for_vid = h.hid');
-      $node_was_published_before_q->condition('h.state', 'published');
-      $node_was_published_before_q->condition('h.vid', $vid, '<');
-      $node_was_published_before = (bool) $node_was_published_before_q
-        ->countQuery()
-        ->execute()
-        ->fetchField();
-
-      if ($node_was_published_before) {
-        throw new MigrateSkipRowException(
-          "Skipping the migration of this published revision: it is the copy of the last published revision. It was saved by Workbench Moderation as a workaround for the lack of a feature in Drupal 7, because it wasn't able to handle forward (non-default) revisions. In Drupal 9 this is not needed anymore.",
-          TRUE
-        );
-      }
-    }
-  }
-
-  // Ignore the migration of the current non-default (not published) revision
-  // if:
-  // 1. the next transition (whose node revision exists) "from_state" and
-  //    "[to_]state" is "published"
-  // 2. There isn't any previous node revision which was migrated as
-  //    "published".
-  if ($revisions_last_transition['state'] !== "published") {
-    // @code
-    // SELECT h.*, nr.status AS status FROM workbench_moderation_node_history h
-    // LEFT OUTER JOIN node_revision nr ON nr.nid = h.nid AND nr.vid = h.vid
-    // WHERE (h.nid = 5) AND (nr.status IS NOT NULL) AND (h.vid > 505)
-    // ORDER BY h.vid ASC, h.hid DESC
-    // -- LIMIT 1 OFFSET 0
-    // @endcode
-    $next_migratable_transition_q = $source->getDatabase()->select('workbench_moderation_node_history', 'h')
-      ->fields('h')
-      ->fields('nr', ['status'])
-      ->condition('h.nid', $nid);
-    $next_migratable_transition_q->innerJoin('node_revision', 'nr', 'nr.nid = h.nid AND nr.vid = h.vid');
-    $next_migratable_transition_q->condition('h.vid', $vid, '>')
-      ->orderBy('h.vid', 'ASC')
-      ->orderBy('h.hid', 'DESC')
-      ->range(0, 1);
-    $next_migratable_transition = $next_migratable_transition_q
-      ->execute()
-      ->fetchAll(\PDO::FETCH_ASSOC);
-
-    // [1] applies, let's check [2].
-    if (
-      !empty($next_migratable_transition[0]['from_state']) &&
-      $next_migratable_transition[0]['from_state'] === 'published' &&
-      $next_migratable_transition[0]['state'] === 'published'
-    ) {
-      // @code
-      // SELECT h.* from workbench_moderation_node_history h
-      // INNER JOIN (
-      //   SELECT hi.vid, MAX(hi.hid) as highest_hid
-      //   FROM workbench_moderation_node_history hi
-      //   WHERE (hi.nid = 5) AND (hi.vid < 507)
-      //   GROUP BY hi.vid
-      // ) i on i.highest_hid = h.hid
-      // WHERE h.state = 'published'
-      // ORDER BY h.vid DESC
-      // @endcode
-      $previously_migrated_published_transition_q = $source->getDatabase()
-        ->select('workbench_moderation_node_history', 'h')
-        ->condition('h.state', 'published');
-      $inner = $source->getDatabase()->select('workbench_moderation_node_history', 'hi')
-        ->fields('hi', ['vid'])
-        ->condition('hi.nid', $nid)
-        ->condition('hi.vid', $vid, '<');
-      $inner->addExpression('MAX(hi.hid)', 'highest_hid');
-      $inner->groupBy('hi.vid');
-      $previously_migrated_published_transition_q->join($inner, 'i', 'i.highest_hid = h.hid');
-      $previously_migrated_published_transition_q->join('node_revision', 'nr', 'h.vid = nr.vid');
-      $previously_migrated_published_transition = (int) $previously_migrated_published_transition_q
-        ->countQuery()
-        ->execute()
-        ->fetchField();
-
-      if (!$previously_migrated_published_transition) {
-        throw new MigrateSkipRowException(
-          "Skipping the migration of this draft revision: it lacks its previous revision. It happens because with Drupal 7 Workbench Moderation it was possible to delete older revisions, but in Drupal 9 core it is impossible to restore the original data integrity. Hopefully it isn't a problem that a draft cannot be restored.",
-          TRUE
-        );
-      }
-    }
-  }
-
-  // If the last active ("is_current") moderation state of the entity isn't
-  // published, then we shouldn't allow the entire entity being published: we
-  // have to archive the entity.
-  // @todo Maybe it is better to check the last "is_current" entity
-  //   revision?
-  // @todo Describe differences between d7 and d9 moderation.
-  // @todo What should we check here? $state['state'] === 'published' OR
-  //   $state['published']?
-  $next_transitions = $source->getDatabase()
-    ->select('workbench_moderation_node_history', 'h')
-    ->condition('h.nid', $nid)
-    ->condition('h.vid', $vid, '>');
-  $next_transitions->innerJoin('node_revision', 'nr', 'nr.vid = h.vid');
-  $num_of_next_transitions = (int) $next_transitions->countQuery()
-    ->execute()
-    ->fetchField();
-
-  $moderation_state = $revisions_last_transition['state'];
-  if (!$num_of_next_transitions && $moderation_state !== 'published') {
-    $node_was_published_before_q = $source->getDatabase()
-      ->select('workbench_moderation_node_history', 'h')
-      ->condition('h.nid', $nid);
-    // Restrict to existing node revisions.
-    $node_was_published_before_q->innerJoin('node_revision', 'nr', 'nr.vid = h.vid');
-    // Subquery for getting only the highest history ID for the same revision.
-    $nwpbq_sub = $source->getDatabase()
-      ->select('workbench_moderation_node_history', 'w')
-      ->fields('w', ['vid'])
-      ->condition('w.nid', $nid);
-    $nwpbq_sub->addExpression('MAX(w.hid)', 'highest_hid_for_vid');
-    $nwpbq_sub->groupBy('w.vid');
-    $node_was_published_before_q->innerJoin($nwpbq_sub, 'hhfv', 'hhfv.highest_hid_for_vid = h.hid');
-    $node_was_published_before_q->condition('h.state', 'published');
-    $node_was_published_ever = (bool) $node_was_published_before_q
-      ->countQuery()
-      ->execute()
-      ->fetchField();
-
-    $moderation_state = $node_was_published_ever
-      ? 'archive'
-      : $revisions_last_transition['state'];
-  }
-
-  $row->setSourceProperty('workbench_moderation_state', $moderation_state);
+  ModerationStateMigrate::prepareModeratedNodeRow($row, $source->getDatabase());
 }

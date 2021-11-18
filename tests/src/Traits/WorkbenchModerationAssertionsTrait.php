@@ -166,20 +166,37 @@ trait WorkbenchModerationAssertionsTrait {
    *   revision ID.
    *   The first value represents to "status", second one "moderation_state",
    *   the third one "revision_default".
+   * @param string|int|null $entity_id
+   *   The identifier of the entity.
    */
-  protected function assertModerationStates(string $entity_type_id, array $expected_moderation_states) {
+  protected function assertModerationStates(string $entity_type_id, array $expected_moderation_states, $entity_id = NULL) {
     $storage = $this->container->get('entity_type.manager')->getStorage($entity_type_id);
     assert($storage instanceof RevisionableStorageInterface);
     $actual_states = [];
     $expected_states = [];
-    foreach ($expected_moderation_states as $revision_id => $expectations) {
-      [$expected_status, $expected_moderation_state, $expected_revision_default] = $expectations;
+    $available_revision_ids = array_keys($expected_moderation_states);
+    if ($entity_id) {
+      $entity_type = $storage->getEntityType();
+      $available_revision_ids = array_keys(
+        $storage->getQuery()
+          ->accessCheck(FALSE)
+          ->condition($entity_type->getKey('id'), $entity_id)
+          ->sort($entity_type->getKey('revision'))
+          ->allRevisions()
+          ->execute()
+      );
+    }
+    foreach ($available_revision_ids as $revision_id) {
       $revision = $storage->loadRevision($revision_id);
       $actual_states[$revision_id] = [
         'status' => $revision->status->first()->value ?? 'MISSING!',
         'moderation_state' => $revision->moderation_state->first()->value ?? 'MISSING!',
         'revision_default' => $revision->revision_default->first()->value ?? 'MISSING!',
       ];
+    }
+
+    foreach ($expected_moderation_states as $revision_id => $expectations) {
+      [$expected_status, $expected_moderation_state, $expected_revision_default] = $expectations;
       $expected_states[$revision_id] = [
         'status' => $expected_status,
         'moderation_state' => $expected_moderation_state,
