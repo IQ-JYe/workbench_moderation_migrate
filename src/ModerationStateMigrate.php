@@ -398,6 +398,20 @@ class ModerationStateMigrate {
       }
     }
     $previous_transition = prev($all_revision_history);
+
+    if (!$previous_transition) {
+      return FALSE;
+    }
+
+    // If the previous transition's last history entry is the current revision,
+    // this was a clone.
+    if (
+      ($transition[self::STAMP_CALCULATED] - $previous_transition[self::STAMP_CALCULATED]) >= 0 &&
+      ($transition[self::STAMP_CALCULATED] - $previous_transition[self::STAMP_CALCULATED]) <= self::CLONE_SAVE_TIME_UNCERTAINTY_THRESHOLD
+    ) {
+      return TRUE;
+    }
+
     $previous_previous_transition = $previous_transition ? prev($all_revision_history) : FALSE;
 
     if (!$previous_previous_transition) {

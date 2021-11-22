@@ -1134,6 +1134,100 @@ class WorkbenchModerationMigrateTest extends MigrateDrupal7TestBase {
           ],
         ],
       ],
+
+      'Highest rev ID is not the current published revision (274511)' => [
+        'DB' => [
+          'node' => [
+            [
+              'nid' => 274511,
+              'vid' => 959631,
+              'type' => 'page',
+              'language' => 'en',
+              'title' => 'Node #274511 title',
+              'uid' => 1,
+              'status' => 1,
+              'created' => 1500000000,
+              'changed' => 1619807861,
+              'comment' => 0,
+              'promote' => 0,
+              'sticky' => 0,
+              'tnid' => 0,
+              'translate' => 0,
+            ],
+          ],
+          'node_revision' => [
+            [
+              'nid' => 274511,
+              'vid' => 959631,
+              'uid' => 1,
+              'title' => 'Node #274511 title',
+              'log' => 'Current',
+              'timestamp' => 1619807861,
+              'status' => 1,
+              'comment' => 0,
+              'promote' => 0,
+              'sticky' => 0,
+            ],
+            [
+              'nid' => 274511,
+              'vid' => 959636,
+              'uid' => 1,
+              'title' => 'Node #274511 title',
+              'log' => 'Previous with higher rev',
+              'timestamp' => 1619806567,
+              'status' => 1,
+              'comment' => 0,
+              'promote' => 0,
+              'sticky' => 0,
+            ],
+          ],
+          'workbench_moderation_node_history' => [
+            [
+              'hid' => 733111,
+              'vid' => 959631,
+              'nid' => 274511,
+              'from_state' => 'published',
+              'state' => 'draft',
+              'uid' => 1,
+              'stamp' => 1619806567,
+              'published' => 0,
+              'is_current' => 0,
+            ],
+            [
+              'hid' => 733191,
+              'vid' => 959631,
+              'nid' => 274511,
+              'from_state' => 'draft',
+              'state' => 'published',
+              'uid' => 1,
+              'stamp' => 1619807861,
+              'published' => 1,
+              'is_current' => 1,
+            ],
+            [
+              'hid' => 733116,
+              'vid' => 959636,
+              'nid' => 274511,
+              'from_state' => 'published',
+              'state' => 'published',
+              'uid' => 1,
+              'stamp' => 1619806567,
+              'published' => 0,
+              'is_current' => 0,
+            ],
+          ],
+          'workbench_moderation_states' => WorkbenchModerationFlowTest::WORKBENCH_MODERATION_STATES,
+          'workbench_moderation_transitions' => WorkbenchModerationFlowTest::WORKBENCH_MODERATION_TRANSITIONS,
+        ],
+        'Expected' => [
+          274511 => [
+            'published' => TRUE,
+            'states' => [
+              959631 => [1, 'published', 1],
+            ],
+          ],
+        ],
+      ]
     ];
   }
 
