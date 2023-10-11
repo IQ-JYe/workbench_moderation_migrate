@@ -15,7 +15,7 @@ class WorkbenchModerationFlowTest extends MigMagNativeMigrateSqlTestBase {
   /**
    * {@inheritdoc}
    */
-  public static $modules = [
+  protected static $modules = [
     'migrate_drupal',
     'workbench_moderation_migrate',
   ];

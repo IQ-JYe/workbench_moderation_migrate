@@ -2,7 +2,7 @@ name: Workbench Moderation Migrate
 type: module
 description: Migrates Drupal 7 Workbench Moderation flows to Drupal 9 core's Workflows and Content Moderation.
 package: Migration
-core_version_requirement: ^9
+core_version_requirement: ^9 || ^10
 dependencies:
   - drupal:workflows
   - drupal:content_moderation

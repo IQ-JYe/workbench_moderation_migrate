@@ -42,7 +42,7 @@ class WorkbenchModerationMigrateTest extends MigrateDrupal7TestBase {
    */
   protected function getFixtureFilePath() {
     return implode(DIRECTORY_SEPARATOR, [
-      drupal_get_path('module', 'workbench_moderation_migrate'),
+      \Drupal::service('extension.list.module')->getPath('workbench_moderation_migrate'),
       'tests',
       'fixtures',
       'wm-drupal7.php',

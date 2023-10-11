@@ -19,7 +19,7 @@ abstract class CoreUiMigrateTestBase extends MigrateUpgradeTestBase {
   /**
    * {@inheritdoc}
    */
-  protected function setUp() {
+  protected function setUp(): void {
     parent::setUp();
     $this->loadFixture($this->getDatabaseFixtureFilePath());
   }
@@ -37,7 +37,7 @@ abstract class CoreUiMigrateTestBase extends MigrateUpgradeTestBase {
    */
   protected function getSourceBasePath() {
     return implode(DIRECTORY_SEPARATOR, [
-      drupal_get_path('module', 'migrate_drupal_ui'),
+      \Drupal::service('extension.list.module')->getPath('migrate_drupal_ui'),
       'tests',
       'src',
       'Functional',
