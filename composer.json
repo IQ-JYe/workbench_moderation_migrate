@@ -1,5 +1,5 @@
 {
-    "name": "drupal/workbench_moderation_migrate",
+    "name": "iq-jye/workbench_moderation_migrate",
     "description": "Migrates Drupal 7 Workbench Moderation flows to Drupal 9 core's Workflows and Content Moderation.",
     "homepage": "https://www.drupal.org/project/workbench_moderation_migrate",
     "license": "GPL-2.0-or-later",
